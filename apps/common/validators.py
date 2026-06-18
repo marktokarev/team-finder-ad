@@ -2,10 +2,12 @@ import re
 
 from django.core.exceptions import ValidationError
 
-from apps.common.constants import (DEFAULT_PHONE, GITHUB_URL_PATTERN,
-                                   MAX_PROJECT_NAME_LENGTH,
-                                   MIN_PROJECT_NAME_LENGTH)
-from apps.users.models import User
+from apps.common.constants import (
+    DEFAULT_PHONE,
+    GITHUB_URL_PATTERN,
+    MAX_PROJECT_NAME_LENGTH,
+    MIN_PROJECT_NAME_LENGTH,
+)
 
 
 def validate_github_url(url):
@@ -31,11 +33,6 @@ def validate_phone_number(phone, exclude_user_id=None):
         raise ValidationError(
             'Номер телефона должен быть в формате 8XXXXXXXXXX или +7XXXXXXXXXX'
         )
-    queryset = User.objects.filter(phone=phone)
-    if exclude_user_id:
-        queryset = queryset.exclude(id=exclude_user_id)
-    if queryset.exists():
-        raise ValidationError('Пользователь с таким номером телефона уже существует')
     return phone
 
 

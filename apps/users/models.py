@@ -1,10 +1,15 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models
 from django.utils import timezone
 
-from apps.common.constants import (DEFAULT_PHONE, MAX_ABOUT_LENGTH,
-                                   MAX_NAME_LENGTH, MAX_PHONE_LENGTH)
+from apps.common.constants import (
+    DEFAULT_PHONE,
+    MAX_ABOUT_LENGTH,
+    MAX_NAME_LENGTH,
+    MAX_PHONE_LENGTH,
+)
 from apps.common.validators import validate_phone_number
 
 
@@ -14,6 +19,8 @@ class UserManager(BaseUserManager):
             raise ValueError('Email обязателен')
         email = self.normalize_email(email)
         phone = validate_phone_number(phone)
+        if phone and User.objects.filter(phone=phone).exists():
+            raise ValidationError('Пользователь с таким номером телефона уже существует')
         user = self.model(
             email=email,
             name=name,

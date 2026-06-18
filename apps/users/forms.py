@@ -2,7 +2,10 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 
-from apps.common.validators import validate_github_url, validate_phone_number
+from apps.common.validators import (
+    validate_github_url,
+    validate_phone_number,
+)
 
 from .models import User
 
@@ -13,6 +16,13 @@ class UserRegistrationForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['name', 'surname', 'email', 'password']
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone')
+        phone = validate_phone_number(phone)
+        if User.objects.filter(phone=phone).exists():
+            raise ValidationError('Пользователь с таким номером телефона уже существует')
+        return phone
 
     def clean(self):
         cleaned_data = super().clean()
@@ -47,7 +57,10 @@ class UserProfileEditForm(forms.ModelForm):
 
     def clean_phone(self):
         phone = self.cleaned_data.get('phone')
-        return validate_phone_number(phone, exclude_user_id=self.instance.id)
+        phone = validate_phone_number(phone)
+        if User.objects.filter(phone=phone).exclude(id=self.instance.id).exists():
+            raise ValidationError('Пользователь с таким номером телефона уже существует')
+        return phone
 
     def clean_github_url(self):
         url = self.cleaned_data.get('github_url')
