@@ -2,10 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 
-from apps.common.validators import (
-    validate_github_url,
-    validate_phone_number,
-)
+from apps.common.validators import validate_github_url, validate_phone_number
 
 from .models import User
 

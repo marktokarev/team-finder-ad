@@ -4,12 +4,8 @@ from django.core.validators import URLValidator
 from django.db import models
 from django.utils import timezone
 
-from apps.common.constants import (
-    DEFAULT_PHONE,
-    MAX_ABOUT_LENGTH,
-    MAX_NAME_LENGTH,
-    MAX_PHONE_LENGTH,
-)
+from apps.common.constants import (DEFAULT_PHONE, MAX_ABOUT_LENGTH,
+                                   MAX_NAME_LENGTH, MAX_PHONE_LENGTH)
 from apps.common.validators import validate_phone_number
 
 

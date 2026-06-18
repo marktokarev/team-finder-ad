@@ -2,12 +2,9 @@ import re
 
 from django.core.exceptions import ValidationError
 
-from apps.common.constants import (
-    DEFAULT_PHONE,
-    GITHUB_URL_PATTERN,
-    MAX_PROJECT_NAME_LENGTH,
-    MIN_PROJECT_NAME_LENGTH,
-)
+from apps.common.constants import (DEFAULT_PHONE, GITHUB_URL_PATTERN,
+                                   MAX_PROJECT_NAME_LENGTH,
+                                   MIN_PROJECT_NAME_LENGTH)
 
 
 def validate_github_url(url):
