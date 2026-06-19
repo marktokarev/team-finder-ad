@@ -4,12 +4,11 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.common.constants import DEFAULT_PAGE
 from apps.common.pagination import paginate_queryset
 
-from .constants import PROJECT_STATUS_OPEN
 from .forms import ProjectForm
 from .models import Project
 
@@ -17,12 +16,14 @@ from .models import Project
 def project_list_view(request):
     projects = (
         Project.objects
-        .filter(status=PROJECT_STATUS_OPEN)
+        .filter(status=Project.Status.OPEN)
         .select_related('owner')
         .prefetch_related('participants')
-        .order_by('-created_at')
     )
-    page_obj = paginate_queryset(projects, request.GET.get('page'))
+    page_obj = paginate_queryset(
+        projects,
+        request.GET.get('page', DEFAULT_PAGE)
+    )
     context = {
         'projects': page_obj,
     }
@@ -39,52 +40,48 @@ def project_detail_view(request, project_id):
 
 @login_required
 def create_project_view(request):
-    if request.method != 'POST':
-        form = ProjectForm()
-        return render(
-            request,
-            'projects/create-project.html',
-            {'form': form, 'is_edit': False}
-        )
-    form = ProjectForm(request.POST or None)
-    if not form.is_valid():
-        return render(
-            request,
-            'projects/create-project.html',
-            {'form': form, 'is_edit': False}
-        )
-    project = form.save(commit=False)
-    project.owner = request.user
-    project.created_at = timezone.now()
-    project.save()
-    project.participants.add(request.user)
-    messages.success(request, 'Проект успешно создан!')
-    return redirect('projects:project_detail', project_id=project.id)
+    form = (
+        ProjectForm(request.POST or None)
+        if request.method == 'POST'
+        else ProjectForm()
+    )
+    if request.method == 'POST' and form.is_valid():
+        project = form.save(commit=False)
+        project.owner = request.user
+        project.save()
+        project.participants.add(request.user)
+        messages.success(request, 'Проект успешно создан!')
+        return redirect('projects:project_detail', project_id=project.id)
+    return render(
+        request,
+        'projects/create-project.html',
+        {'form': form, 'is_edit': False}
+    )
 
 
 @login_required
 def edit_project_view(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if project.owner != request.user and not request.user.is_staff:
-        messages.error(request, 'У вас нет прав для редактирования этого проекта')
+        messages.error(
+            request,
+            'У вас нет прав для редактирования этого проекта'
+        )
         return redirect('projects:project_detail', project_id=project_id)
-    if request.method != 'POST':
-        form = ProjectForm(instance=project)
-        return render(
-            request,
-            'projects/create-project.html',
-            {'form': form, 'is_edit': True, 'project': project}
-        )
-    form = ProjectForm(request.POST or None, instance=project)
-    if not form.is_valid():
-        return render(
-            request,
-            'projects/create-project.html',
-            {'form': form, 'is_edit': True, 'project': project}
-        )
-    form.save()
-    messages.success(request, 'Проект успешно обновлен!')
-    return redirect('projects:project_detail', project_id=project_id)
+    form = (
+        ProjectForm(request.POST or None, instance=project)
+        if request.method == 'POST'
+        else ProjectForm(instance=project)
+    )
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Проект успешно обновлен!')
+        return redirect('projects:project_detail', project_id=project_id)
+    return render(
+        request,
+        'projects/create-project.html',
+        {'form': form, 'is_edit': True, 'project': project}
+    )
 
 
 @login_required
@@ -104,7 +101,7 @@ def toggle_favorite_view(request, project_id):
 @require_POST
 def toggle_participate_view(request, project_id):
     project = get_object_or_404(Project, id=project_id)
-    if project.status != PROJECT_STATUS_OPEN:
+    if project.status != Project.Status.OPEN:
         return JsonResponse({
             'status': 'error',
             'message': 'Проект закрыт для участия'
@@ -122,12 +119,14 @@ def toggle_participate_view(request, project_id):
 @require_POST
 def complete_project_view(request, project_id):
     project = get_object_or_404(Project, id=project_id)
+
     if project.owner != request.user and not request.user.is_staff:
         return JsonResponse({
             'status': 'error',
             'message': 'У вас нет прав для завершения этого проекта'
         }, status=HTTPStatus.FORBIDDEN)
-    if project.status != PROJECT_STATUS_OPEN:
+
+    if project.status != Project.Status.OPEN:
         return JsonResponse({
             'status': 'error',
             'message': 'Проект уже завершен'
@@ -146,7 +145,13 @@ def favorites_list_view(request):
         request.user.favorites
         .select_related('owner')
         .prefetch_related('participants')
-        .order_by('-created_at')
     )
-    page_obj = paginate_queryset(projects, request.GET.get('page'))
-    return render(request, 'projects/favorite_projects.html', {'projects': page_obj})
+    page_obj = paginate_queryset(
+        projects,
+        request.GET.get('page', DEFAULT_PAGE)
+    )
+    return render(
+        request,
+        'projects/favorite_projects.html',
+        {'projects': page_obj}
+    )

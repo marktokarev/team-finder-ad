@@ -5,8 +5,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.shortcuts import get_object_or_404, redirect, render
 
+from apps.common.constants import DEFAULT_PAGE
 from apps.common.pagination import paginate_queryset
-from apps.projects.constants import PROJECT_STATUS_OPEN
+from apps.projects.models import Project
 
 from .constants import (FILTER_FAVORITE_AUTHORS,
                         FILTER_INTERESTED_IN_MY_PROJECTS,
@@ -17,32 +18,39 @@ from .models import User
 
 
 def register_view(request):
-    if request.method != 'POST':
-        form = UserRegistrationForm()
-        return render(request, 'users/register.html', {'form': form})
-    form = UserRegistrationForm(request.POST or None)
-    if not form.is_valid():
-        return render(request, 'users/register.html', {'form': form})
-    form.save()
-    messages.success(request, 'Регистрация прошла успешно! Теперь вы можете войти.')
-    return redirect('users:login')
+    form = (
+        UserRegistrationForm(request.POST or None)
+        if request.method == 'POST'
+        else UserRegistrationForm()
+    )
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(
+            request,
+            'Регистрация прошла успешно! Теперь вы можете войти.'
+        )
+        return redirect('users:login')
+    return render(request, 'users/register.html', {'form': form})
 
 
 def login_view(request):
-    if request.method != 'POST':
-        form = UserLoginForm()
-        return render(request, 'users/login.html', {'form': form})
-    form = UserLoginForm(data=request.POST or None)
-    if not form.is_valid():
-        return render(request, 'users/login.html', {'form': form})
-    email = form.cleaned_data.get('email')
-    password = form.cleaned_data.get('password')
-    user = authenticate(request, username=email, password=password)
-    if user is None:
-        return render(request, 'users/login.html', {'form': form})
-    login(request, user)
-    messages.success(request, f'Добро пожаловать, {user.get_full_name()}!')
-    return redirect('projects:project_list')
+    form = (
+        UserLoginForm(data=request.POST or None)
+        if request.method == 'POST'
+        else UserLoginForm()
+    )
+    if request.method == 'POST' and form.is_valid():
+        email = form.cleaned_data.get('email')
+        password = form.cleaned_data.get('password')
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            login(request, user)
+            messages.success(
+                request,
+                f'Добро пожаловать, {user.get_full_name()}!'
+            )
+            return redirect('projects:project_list')
+    return render(request, 'users/login.html', {'form': form})
 
 
 @login_required
@@ -56,12 +64,14 @@ def user_detail_view(request, user_id):
     user_profile = get_object_or_404(User, id=user_id)
     projects = (
         user_profile.owned_projects
-        .filter(status=PROJECT_STATUS_OPEN)
+        .filter(status=Project.Status.OPEN)
         .select_related('owner')
         .prefetch_related('participants')
-        .order_by('-created_at')
     )
-    page_obj = paginate_queryset(projects, request.GET.get('page'))
+    page_obj = paginate_queryset(
+        projects,
+        request.GET.get('page', DEFAULT_PAGE)
+    )
     context = {
         'user': user_profile,
         'projects': page_obj,
@@ -72,30 +82,31 @@ def user_detail_view(request, user_id):
 @login_required
 def edit_profile_view(request, user_id):
     if request.user.id != user_id and not request.user.is_staff:
-        messages.error(request, 'У вас нет прав для редактирования этого профиля')
+        messages.error(
+            request,
+            'У вас нет прав для редактирования этого профиля'
+        )
         return redirect('users:user_detail', user_id=user_id)
     user_profile = get_object_or_404(User, id=user_id)
-    if request.method != 'POST':
-        form = UserProfileEditForm(instance=user_profile)
-        return render(
-            request,
-            'users/edit_profile.html',
-            {'form': form, 'profile_user': user_profile}
+    form = (
+        UserProfileEditForm(
+            request.POST or None,
+            request.FILES or None,
+            instance=user_profile
         )
-    form = UserProfileEditForm(
-        request.POST or None,
-        request.FILES or None,
-        instance=user_profile
+        if request.method == 'POST'
+        else UserProfileEditForm(instance=user_profile)
     )
-    if not form.is_valid():
-        return render(
-            request,
-            'users/edit_profile.html',
-            {'form': form, 'profile_user': user_profile}
-        )
-    form.save()
-    messages.success(request, 'Профиль успешно обновлен')
-    return redirect('users:user_detail', user_id=user_id)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Профиль успешно обновлен')
+        return redirect('users:user_detail', user_id=user_id)
+
+    return render(
+        request,
+        'users/edit_profile.html',
+        {'form': form, 'profile_user': user_profile}
+    )
 
 
 @login_required
@@ -106,20 +117,21 @@ def change_password_view(request, user_id):
             'У вас нет прав для изменения пароля этого пользователя'
         )
         return redirect('users:user_detail', user_id=user_id)
-    if request.method != 'POST':
-        form = PasswordChangeForm(request.user)
-        return render(request, 'users/change_password.html', {'form': form})
-    form = PasswordChangeForm(request.user, request.POST or None)
-    if not form.is_valid():
-        return render(request, 'users/change_password.html', {'form': form})
-    user = form.save()
-    update_session_auth_hash(request, user)
-    messages.success(request, 'Пароль успешно изменен')
-    return redirect('users:user_detail', user_id=user_id)
+    form = (
+        PasswordChangeForm(request.user, request.POST or None)
+        if request.method == 'POST'
+        else PasswordChangeForm(request.user)
+    )
+    if request.method == 'POST' and form.is_valid():
+        user = form.save()
+        update_session_auth_hash(request, user)
+        messages.success(request, 'Пароль успешно изменен')
+        return redirect('users:user_detail', user_id=user_id)
+    return render(request, 'users/change_password.html', {'form': form})
 
 
 def participants_list_view(request):
-    participants = User.objects.filter(is_active=True).order_by('-created_at')
+    participants = User.objects.filter(is_active=True)
     filter_type = request.GET.get('filter')
     active_filter = ''
     if request.user.is_authenticated and filter_type:
@@ -144,7 +156,10 @@ def participants_list_view(request):
             participants = participants.filter(
                 participated_projects__in=my_projects
             ).distinct()
-    page_obj = paginate_queryset(participants, request.GET.get('page'))
+    page_obj = paginate_queryset(
+        participants,
+        request.GET.get('page', DEFAULT_PAGE)
+    )
     context = {
         'participants': page_obj,
         'active_filter': active_filter,

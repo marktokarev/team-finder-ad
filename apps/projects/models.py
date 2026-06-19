@@ -1,6 +1,5 @@
 from django.core.validators import URLValidator
 from django.db import models
-from django.utils import timezone
 
 from apps.common.constants import MAX_PROJECT_NAME_LENGTH, MAX_STATUS_LENGTH
 
@@ -10,15 +9,25 @@ class Project(models.Model):
         OPEN = 'open', 'Открыт'
         CLOSED = 'closed', 'Закрыт'
 
-    name = models.CharField(max_length=MAX_PROJECT_NAME_LENGTH, verbose_name='Название проекта')
-    description = models.TextField(blank=True, default='', verbose_name='Описание')
+    name = models.CharField(
+        max_length=MAX_PROJECT_NAME_LENGTH,
+        verbose_name='Название проекта'
+    )
+    description = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Описание'
+    )
     owner = models.ForeignKey(
         'users.User',
         on_delete=models.CASCADE,
         related_name='owned_projects',
         verbose_name='Автор'
     )
-    created_at = models.DateTimeField(default=timezone.now, verbose_name='Дата создания')
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
     github_url = models.URLField(
         blank=True,
         default='',

@@ -2,7 +2,6 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models
-from django.utils import timezone
 
 from apps.common.constants import (DEFAULT_PHONE, MAX_ABOUT_LENGTH,
                                    MAX_NAME_LENGTH, MAX_PHONE_LENGTH)
@@ -65,7 +64,7 @@ class User(AbstractUser):
         verbose_name='О себе'
     )
     created_at = models.DateTimeField(
-        default=timezone.now,
+        auto_now_add=True,
         verbose_name='Дата создания'
     )
     favorites = models.ManyToManyField(
@@ -83,6 +82,9 @@ class User(AbstractUser):
         verbose_name_plural = 'Пользователи'
         ordering = ['-created_at']
 
+    def __str__(self):
+        return self.get_full_name()
+
     def save(self, *args, **kwargs):
         if self.phone and self.phone.startswith('8'):
             self.phone = '+7' + self.phone[1:]
@@ -90,6 +92,3 @@ class User(AbstractUser):
 
     def get_full_name(self):
         return f'{self.name} {self.surname}'
-
-    def __str__(self):
-        return self.get_full_name()
